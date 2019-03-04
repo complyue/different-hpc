@@ -1,0 +1,33 @@
+# a machine with unknown MAC address will have an available IP address assigned to it,
+# then a configuration file written for it, which can be altered later by hand or through web UI.
+# only IPv4 addresses within a class C subnet is supported so far
+autoip:
+  prefix: 192.168.11.
+  range: [201, 250]
+
+# network configuration
+gateway: 192.168.11.1
+netmask: 255.255.255.0
+hostname: "dwc{{.ipnum}}"
+
+# nfsroot
+nfs_server: 192.168.11.10
+nfs_path: /dwcroot
+nfs_options: rw,noacl
+
+# add single to kernel cmdline to boot into single user run level for rescue
+rescue: ""
+#rescue: single
+
+# pieces will ultimately be assemblied according to pixiecore API's expectation
+kernel: file:///dwcroot/boot/kernel
+initrd:
+  - file:///dwcroot/boot/initrd
+cmdline:
+  # elements of this sequence will be joined into a single string,
+  # with a single space as separator, before passed to pixiecore.
+  # while empty values will be dropped.
+  - root=/dev/nfs
+  - nfsroot={{.nfs_server}}:{{.nfs_path}},{{.nfs_options}}
+  - ip={{.ip}}:{{.nfs_server}}:{{.gateway}}:{{.netmask}}:{{.hostname}}::none
+  - "{{.rescue}}"

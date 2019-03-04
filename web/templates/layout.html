@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!---->
+    <title>{% block title %} {{ title | default: "?!?" }} {% endblock %}</title>
+
+    <!---->
+    {% block head %}
+    <link rel="icon" href="/static/favicon.png" />
+
+    {% endblock head %}
+  </head>
+
+  <body>
+    {% block body %}
+
+    <!---->
+    {% block body_begin_scripts %}
+    <!---->
+    {% endblock body_begin_scripts %}
+
+    <!---->
+    {% block body_content %}
+    <!---->
+    {% endblock body_content %}
+
+    <!---->
+    {% block body_end_scripts %}
+    <!---->
+    {% endblock body_end_scripts %}
+
+    <!---->
+    {% endblock body %}
+  </body>
+</html>

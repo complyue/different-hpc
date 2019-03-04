@@ -1,0 +1,5 @@
+# don't repeat check too often
+checkInterval: 1h
+
+# confirm death only after this long
+deathConfirm: 48h

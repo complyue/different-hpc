@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "web",
+      "type": "go",
+      "request": "launch",
+      "stackTraceDepth": 50,
+      "mode": "debug",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/cmd/web",
+      "args": [
+        "-dev"
+        //   "-logtostderr=false",
+        //   "-log_dir=log",
+        //   "-stderrthreshold=WARNING"
+      ]
+    }
+  ]
+}
