@@ -13,7 +13,7 @@ hostname: "dwc{{.ipnum}}"
 # nfsroot
 nfs_server: 192.168.11.10
 nfs_path: /dwcroot
-nfs_options: rw,noacl
+nfs_options: ro,noacl
 
 # add single to kernel cmdline to boot into single user run level for rescue
 rescue: ""
