@@ -1,18 +1,77 @@
 {% extends 'layout.html' %}
 
 <!---->
+{% block head %}
+{{ block.Super | safe }}
+
+<link rel="stylesheet" href="/static/cc.css" type="text/css" />
+
+{% endblock head %}
+
+<!---->
 {% block body_content %}
 
 <div class="page_header">
   <h3>{{ title }}</h3>
 </div>
 
-<section id="entry_list">
-  <ul>
-    <li style="margin: 12pt;">
-      xXx
-    </li>
-  </ul>
+<section id="cnodes_info">
+  <h5>Computing Nodes</h5>
+  <table id="cnode_tbl">
+    <thead>
+      <tr>
+        <th>Host Name</th>
+        <th>Last Alive</th>
+        <th>Last Check</th>
+        <th>IP/MAC</th>
+        <th>Configuration</th>
+      </tr>
+    </thead>
+    <tbody>
+      {%for cnode in cnodes %} {%with cnode.Cfg.Inflate() as cfg%}
+      <tr>
+        <td>{{ cfg.hostname }}</td>
+        <td>
+          {{ cnode.LastAlive | date: "2006-01-02" | safe }}
+          <br />
+          {%if cnode.AssumeAlive %} &#x2714;{%else%} &#x2718; {%endif%}
+          {{ cnode.LastAlive | date: "15:04:05" | safe }}
+        </td>
+        <td>
+          {{ cnode.LastCheck | date: "2006-01-02" | safe }}
+          <br />
+          {%if cnode.CheckedAlive %} &#x2714;{%else%} &#x2718; {%endif%}
+          {{ cnode.LastCheck | date: "15:04:05" | safe }}
+        </td>
+        <td>{{ cfg.ip }} <br />{{ cnode.Cfg.Mac }}</td>
+        <td>
+          <div
+            style="display: flex; flex-flow: column nowrap; align-items: end;"
+          >
+            <label style="flex: none;">
+              {{- cnode.Cfg.FileName -}}
+            </label>
+            <textarea
+              readonly
+              style="overflow: scroll; width: 100%; flex: 1; resize: both;"
+            >
+            {{- cnode.Cfg.RawYaml | safe -}}
+          </textarea
+            >
+          </div>
+        </td>
+      </tr>
+      {%endwith%} {%endfor%}
+    </tbody>
+  </table>
 </section>
 
 {% endblock body_content %}
+
+<!---->
+{% block body_end_scripts %}
+<!---->
+
+<script type="module" modu src="/static/cc.js"></script>
+
+{% endblock body_end_scripts %}

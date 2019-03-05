@@ -8,7 +8,7 @@
       "stackTraceDepth": 50,
       "mode": "debug",
       "cwd": "${workspaceFolder}",
-      "program": "${workspaceFolder}/cmd/web",
+      "program": "${workspaceFolder}/cmd/dhpc-cc",
       "args": [
         "-dev"
         //   "-logtostderr=false",

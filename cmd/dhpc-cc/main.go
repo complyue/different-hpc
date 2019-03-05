@@ -45,13 +45,13 @@ func main() {
 
 	router := mux.NewRouter()
 
-	bknd.DefineHttpRoutes(router)
+	bknd.DefineApiRoutes(router)
 
 	router.PathPrefix("/static/").Handler(
 		http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static"))),
 	)
 
-	definePageRoutes(router)
+	bknd.DefinePageRoutes(router)
 
 	srv := &http.Server{
 		Handler:      router,
@@ -66,7 +66,7 @@ func main() {
 		return
 	}
 
-	glog.Infof("HPC booter web serving at http://%s ...\n", ln.Addr())
+	glog.Infof("Different HPC Control Center web serving at http://%s ...\n", ln.Addr())
 	err = srv.Serve(tcpKeepAliveListener{ln.(*net.TCPListener)})
 }
 

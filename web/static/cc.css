@@ -1,0 +1,39 @@
+table {
+  padding: 10pt;
+  min-height: 10pt;
+  border: solid 1pt;
+  border-collapse: collapse;
+}
+
+tr {
+  display: table-row;
+  padding: 10pt;
+  min-height: 10pt;
+  border: solid 1pt;
+  border-collapse: collapse;
+}
+
+th {
+  display: table-cell;
+  min-width: 12pt;
+  min-height: 10pt;
+  padding: 6pt;
+  text-align: center;
+  font-size: 12pt;
+  font-weight: bold;
+  border: solid 1pt;
+  border-collapse: collapse;
+}
+
+td {
+  display: table-cell;
+  padding: 6pt;
+  text-align: center;
+  font-size: 12pt;
+  border: solid 1pt;
+  border-collapse: collapse;
+}
+
+hr {
+  border-color: #ddd;
+}

@@ -3,6 +3,7 @@ package ccm
 import (
 	"io/ioutil"
 	"os/exec"
+	"sort"
 	"sync"
 	"time"
 
@@ -59,49 +60,60 @@ func GetPulseCfg() *PulseCfg {
 	return pulseCfg
 }
 
-type checkedAliveness struct {
-	assumeAlive, checkedAlive bool
-	lastAlive, lastCheck      time.Time
+type IpAliveness struct {
+	IP string
+
+	AssumeAlive, CheckedAlive bool
+	LastAlive, LastCheck      time.Time
+
+	Cfg interface{}
 }
 
 var (
-	aliveness       = make(map[string]checkedAliveness)
+	aliveness       = make(map[string]IpAliveness)
 	alivenessMutext sync.Mutex
 )
 
-func CareIpAliveness(ip string, assumeAlive bool) {
+func CareIpAliveness(ip string, AssumeAlive bool, cfg interface{}) {
 	alivenessMutext.Lock()
 	defer alivenessMutext.Unlock()
 
-	var lastAlive time.Time
-	if assumeAlive {
-		lastAlive = time.Now()
+	var LastAlive time.Time
+	if AssumeAlive {
+		LastAlive = time.Now()
 	}
-	aliveness[ip] = checkedAliveness{
-		assumeAlive: assumeAlive, lastAlive: lastAlive,
-		checkedAlive: assumeAlive, lastCheck: time.Time{},
+	aliveness[ip] = IpAliveness{
+		IP:          ip,
+		AssumeAlive: AssumeAlive, LastAlive: LastAlive,
+		CheckedAlive: false, LastCheck: time.Time{},
+		Cfg: cfg,
 	}
 }
 
-func CheckIpAlive(ip string) (bool, time.Time) {
+func CheckIpAlive(ip string) (bool, time.Time, interface{}) {
 	alivenessMutext.Lock()
 	defer alivenessMutext.Unlock()
+
+	return _checkIpAlive(ip)
+}
+
+func _checkIpAlive(ip string) (bool, time.Time, interface{}) {
 
 	pulseCfg := GetPulseCfg()
 	knownState, caring := aliveness[ip]
 
-	if caring && knownState.assumeAlive {
+	if caring && knownState.AssumeAlive {
 		// assuming alive
-		if time.Now().Before(knownState.lastAlive.Add(pulseCfg.CheckInterval)) {
+		if time.Now().Before(knownState.LastAlive.Add(pulseCfg.CheckInterval)) {
 			// assumption still valid
-			return true, knownState.lastAlive
+			return true, knownState.LastAlive, knownState.Cfg
 		}
 
 		// not actually alive after the configured interval, check should be carried out periodically
 
-		if !knownState.lastCheck.IsZero() && time.Now().Before(knownState.lastCheck.Add(pulseCfg.CheckInterval)) {
+		if !knownState.LastCheck.IsZero() && time.Now().Before(knownState.LastCheck.Add(pulseCfg.CheckInterval)) {
 			// no hurry to repeat another death check
-			return true, knownState.lastAlive
+			return true, knownState.LastAlive, knownState.Cfg
 		}
 	}
 
@@ -109,21 +121,23 @@ func CheckIpAlive(ip string) (bool, time.Time) {
 	pingCmd := exec.Command("ping", "-c", "3")
 	pingCmd.Stdin, pingCmd.Stdout, pingCmd.Stderr = nil, nil, nil
 	if err := pingCmd.Run(); err == nil {
-		glog.V(1).Infof("IP [%s] is alive.")
+		glog.V(1).Infof("IP [%s] is alive.", ip)
 		// start/continue caring its aliveness as got positive result at this instant
-		knownState = checkedAliveness{
-			assumeAlive: true, lastAlive: now,
-			checkedAlive: true, lastCheck: now,
+		knownState = IpAliveness{
+			IP:          ip,
+			AssumeAlive: true, LastAlive: now,
+			CheckedAlive: true, LastCheck: now,
 		}
 		aliveness[ip] = knownState
 	} else if ee, ok := err.(*exec.ExitError); ok {
 		glog.V(1).Infof("IP [%s] not alive, ping result: %v", ip, ee)
-		if caring && knownState.assumeAlive {
-			if now.After(knownState.lastAlive.Add(pulseCfg.DeathConfirm)) {
+		if caring && knownState.AssumeAlive {
+			if now.After(knownState.LastAlive.Add(pulseCfg.DeathConfirm)) {
 				// confirm death after the configured duration
-				knownState = checkedAliveness{
-					assumeAlive: false, lastAlive: knownState.lastAlive,
-					checkedAlive: false, lastCheck: now,
+				knownState = IpAliveness{
+					IP:          ip,
+					AssumeAlive: false, LastAlive: knownState.LastAlive,
+					CheckedAlive: false, LastCheck: now,
 				}
 				aliveness[ip] = knownState
 			} else {
@@ -131,11 +145,44 @@ func CheckIpAlive(ip string) (bool, time.Time) {
 			}
 		} else {
 			// not assuming alive, return affirmative dead conclusion
-			return false, time.Time{}
+			return false, time.Time{}, nil
 		}
 	} else {
 		panic(errors.Errorf("Unexpected error calling ping: %+v", err))
 	}
 
-	return knownState.assumeAlive, knownState.lastAlive
+	return knownState.AssumeAlive, knownState.LastAlive, knownState.Cfg
+}
+
+func ListCaredIPs() []IpAliveness {
+	pulseCfg := GetPulseCfg()
+	var caList []IpAliveness
+
+	func() { // sync load
+		caList = make([]IpAliveness, 0, len(aliveness))
+		alivenessMutext.Lock()
+		defer alivenessMutext.Unlock()
+
+		checkThres := time.Now().Add(-pulseCfg.CheckInterval)
+		for ip, ca := range aliveness {
+			if ca.LastCheck.Before(checkThres) {
+				if alive, lastAlive, cfg := _checkIpAlive(ip); alive && cfg != ca.Cfg {
+					glog.Warningf("ip=[%s] alive up to %v as another cfg:\n%+v\n - vs -\n%+v",
+						ip, lastAlive, cfg, ca.Cfg)
+					continue
+				}
+			}
+			caList = append(caList, ca)
+		}
+	}()
+
+	// sort with most recent first, after load
+	sort.Slice(caList, func(i, j int) bool {
+		if caList[i].LastAlive == caList[j].LastAlive {
+			return caList[i].LastCheck.After(caList[j].LastCheck)
+		}
+		return caList[i].LastAlive.After(caList[j].LastAlive)
+	})
+
+	return caList
 }
