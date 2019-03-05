@@ -1,5 +1,8 @@
+# user name used in ssh url
+sshUser: dwa
+
 # don't repeat check too often
-checkInterval: 1h
+checkInterval: 10m
 
 # confirm death only after this long
 deathConfirm: 48h

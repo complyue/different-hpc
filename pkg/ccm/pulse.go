@@ -13,6 +13,9 @@ import (
 )
 
 type PulseCfg struct {
+	// user name used in ssh url
+	SshUser string
+
 	// don't repeat check too often
 	CheckInterval time.Duration
 
@@ -33,10 +36,12 @@ func GetPulseCfg() *PulseCfg {
 		if err = yaml.Unmarshal(cfgRawYaml, &cfgYaml); err != nil {
 			panic(err)
 		}
-		checkInterval, deathConfirm := "1h", "48h"
+		sshUser, checkInterval, deathConfirm := "root", "1h", "48h"
 		for _, cfgItem := range cfgYaml {
 			if cfgKey, ok := cfgItem.Key.(string); ok {
-				if "checkInterval" == cfgKey {
+				if "sshUser" == cfgKey {
+					sshUser = cfgItem.Value.(string)
+				} else if "checkInterval" == cfgKey {
 					checkInterval = cfgItem.Value.(string)
 				} else if "deathConfirm" == cfgKey {
 					deathConfirm = cfgItem.Value.(string)
@@ -52,6 +57,7 @@ func GetPulseCfg() *PulseCfg {
 			panic(err)
 		}
 		pulseCfg = &PulseCfg{
+			SshUser:       sshUser,
 			CheckInterval: CheckInterval, DeathConfirm: DeathConfirm,
 		}
 	} else {
@@ -118,7 +124,7 @@ func _checkIpAlive(ip string) (bool, time.Time, interface{}) {
 	}
 
 	now := time.Now()
-	pingCmd := exec.Command("ping", "-c", "3")
+	pingCmd := exec.Command("ping", "-c", "3", ip)
 	pingCmd.Stdin, pingCmd.Stdout, pingCmd.Stderr = nil, nil, nil
 	if err := pingCmd.Run(); err == nil {
 		glog.V(1).Infof("IP [%s] is alive.", ip)
@@ -127,23 +133,29 @@ func _checkIpAlive(ip string) (bool, time.Time, interface{}) {
 			IP:          ip,
 			AssumeAlive: true, LastAlive: now,
 			CheckedAlive: true, LastCheck: now,
+			Cfg: knownState.Cfg,
 		}
 		aliveness[ip] = knownState
 	} else if ee, ok := err.(*exec.ExitError); ok {
-		glog.V(1).Infof("IP [%s] not alive, ping result: %v", ip, ee)
-		if caring && knownState.AssumeAlive {
-			if now.After(knownState.LastAlive.Add(pulseCfg.DeathConfirm)) {
-				// confirm death after the configured duration
-				knownState = IpAliveness{
-					IP:          ip,
-					AssumeAlive: false, LastAlive: knownState.LastAlive,
-					CheckedAlive: false, LastCheck: now,
+		glog.V(1).Infof("IP [%s] not alive, ping %+v", ip, ee)
+		if caring {
+			knownState.CheckedAlive = false
+			knownState.LastCheck = now
+			if knownState.AssumeAlive { // check if death can be confirmed now
+				if now.After(knownState.LastAlive.Add(pulseCfg.DeathConfirm)) {
+					// confirm death after the configured duration
+					knownState = IpAliveness{
+						IP:          ip,
+						AssumeAlive: false, LastAlive: knownState.LastAlive,
+						CheckedAlive: false, LastCheck: now,
+						Cfg: nil,
+					}
+					aliveness[ip] = knownState
+				} else {
+					// not positive alive, but keep assumption for now
+					return true, knownState.LastAlive, knownState.Cfg
 				}
-				aliveness[ip] = knownState
-			} else {
-				// not positive alive, but keep assumption for now
 			}
-		} else {
 			// not assuming alive, return affirmative dead conclusion
 			return false, time.Time{}, nil
 		}

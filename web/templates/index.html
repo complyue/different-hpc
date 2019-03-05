@@ -43,7 +43,11 @@
           {%if cnode.CheckedAlive %} &#x2714;{%else%} &#x2718; {%endif%}
           {{ cnode.LastCheck | date: "15:04:05" | safe }}
         </td>
-        <td>{{ cfg.ip }} <br />{{ cnode.Cfg.Mac }}</td>
+        <td>
+          <a href="ssh://{{ sshUser }}@{{ cnode.IP }}">{{ cnode.IP }}</a>
+          <br />
+          {{ cnode.Cfg.Mac }}
+        </td>
         <td>
           <div
             style="display: flex; flex-flow: column nowrap; align-items: end;"

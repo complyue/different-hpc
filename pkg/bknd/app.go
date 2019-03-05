@@ -16,6 +16,9 @@ func DefinePageRoutes(router *mux.Router) {
 		UpdateCtx: func(ctx pongo2.Context, r *http.Request) {
 			ctx["title"] = "Different HPC Control Center"
 
+			pulseCfg := ccm.GetPulseCfg()
+			ctx["sshUser"] = pulseCfg.SshUser
+
 			ccm.GetComputeNodeCfgs()
 			ctx["cnodes"] = ccm.ListCaredIPs()
 		},
