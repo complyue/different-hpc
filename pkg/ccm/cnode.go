@@ -171,11 +171,25 @@ func PrepareComputeNodeCfg(mac string) (*ComputeNodeCfg, error) {
 	_getComputeNodeCfgs()
 
 	if cfg, ok := knownComputeNodeCfgs[mac]; ok {
-		// already loaded, check reload in case file modified after last load
+		// already loaded
+		// check reload in case file modified after last load
 		if fi, err := os.Stat(cfg.FileName); err == nil {
-			if fi.ModTime() == cfg.FileTime {
+			if cfg.Mac != mac {
+				glog.Errorf("Config file [%s] contains invalid mac=[%s] vs [%s] ?!",
+					cfg.FileName, cfg.Mac, mac)
+				d, f := filepath.Split(cfg.FileName)
+				bogonFileName := fmt.Sprintf("%s~bogon-%s-%s", d, f, time.Now().Format("20060102150405"))
+				glog.Infof("Renaming bogus config file from [%s] to [%s] ...",
+					cfg.FileName, bogonFileName)
+				os.Rename(cfg.FileName, bogonFileName)
+				delete(knownComputeNodeCfgs, mac)
+				glog.Warningf("A new configuration will be generated for mac=[%s]", mac)
+
+			} else if fi.ModTime() == cfg.FileTime {
 				return cfg, nil
 			}
+		} else {
+			glog.Warningf("Config file [%s] for mac=[%s] deleted ?", cfg.FileName, cfg.Mac)
 		}
 	}
 
@@ -300,13 +314,13 @@ func PrepareComputeNodeCfg(mac string) (*ComputeNodeCfg, error) {
 		switch deadCfg := reuseIP.LastCfg.(type) {
 		case *ComputeNodeCfg:
 			d, f := filepath.Split(deadCfg.FileName)
-			deadFileName := d + "~" + f
-			glog.Infof("To reuse ip=[%s], now the old config file is to be renamed from [%s] to [%s].",
-				reuseIP.IP, deadCfg.FileName, deadFileName)
-			os.Rename(deadCfg.FileName, deadFileName)
+			corpseFileName := fmt.Sprintf("%s~corpse-%s-%s", d, f, time.Now().Format("20060102150405"))
+			glog.Infof("To reuse ip=[%s], the old config file is to be renamed from [%s] to [%s] ...",
+				reuseIP.IP, deadCfg.FileName, corpseFileName)
+			os.Rename(deadCfg.FileName, corpseFileName)
 			delete(knownComputeNodeCfgs, deadCfg.Mac)
 			glog.Warningf("Reusing ip=[%s] from [%s], which has been renamed to [%s]",
-				reuseIP.IP, deadCfg.FileName, deadFileName)
+				reuseIP.IP, deadCfg.FileName, corpseFileName)
 		default:
 			glog.Warningf("ip=[%s] not bound to any known config ?! cfg type=%T", reuseIP.IP, deadCfg)
 			glog.Warningf("Reusing ip=[%s]", ip)
@@ -339,9 +353,8 @@ func PrepareComputeNodeCfg(mac string) (*ComputeNodeCfg, error) {
 
 	// record the cfg, mark it alive even before booted
 	cfg := &ComputeNodeCfg{
-		Mac: mac, FileName: fileName,
-		FileTime: fi.ModTime(),
-		RawYaml:  string(rawYaml), CfgYaml: cfgYaml,
+		Mac: mac, FileName: fileName, FileTime: fi.ModTime(),
+		RawYaml: string(rawYaml), CfgYaml: cfgYaml,
 	}
 	knownComputeNodeCfgs[mac] = cfg
 	CareIpAliveness(ip, true, cfg)

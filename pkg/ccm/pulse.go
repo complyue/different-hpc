@@ -62,7 +62,7 @@ type IpAliveness struct {
 var (
 	aliveness       = make(map[string]IpAliveness)
 	alivenessMutext sync.Mutex
-	aliveCheckQueue = make(chan IpAliveness, 500)
+	aliveCheckQueue = make(chan string, 500)
 )
 
 func CareIpAliveness(ip string, AssumeAlive bool, cfg interface{}) {
@@ -83,27 +83,47 @@ func CareIpAliveness(ip string, AssumeAlive bool, cfg interface{}) {
 
 func init() {
 	go func() {
-
 		for {
-			a2c := <-aliveCheckQueue
+			var (
+				ip     = <-aliveCheckQueue
+				a2c    IpAliveness
+				caring bool
+			)
+			func() {
+				alivenessMutext.Lock()
+				defer alivenessMutext.Unlock()
+
+				a2c, caring = aliveness[ip]
+			}()
+			if !caring {
+				glog.Warningf("Not caring ip=[%s] anymore.", ip)
+				continue
+			}
 
 			pulseCfg := GetPulseCfg()
 			now := time.Now()
 			if now.Before(a2c.LastCheck.Add(pulseCfg.CheckInterval)) {
 				// not repeating check within interval
+				if now.Sub(a2c.LastCheck) < time.Duration(pulseCfg.PingCount)*time.Second {
+					// very near to next check time
+					if len(aliveCheckQueue)*2 < cap(aliveCheckQueue) {
+						// and queue is not much crowded
+						aliveCheckQueue <- ip // schedule another check
+					}
+				}
 				continue
 			}
 
-			glog.V(1).Infof("Pinging ip=[%s] for alive check ...", a2c.IP)
-			pingCmd := exec.Command("ping", "-c", fmt.Sprintf("%d", pulseCfg.PingCount), a2c.IP)
+			glog.V(1).Infof("Pinging ip=[%s] for alive check ...", ip)
+			pingCmd := exec.Command("ping", "-c", fmt.Sprintf("%d", pulseCfg.PingCount), ip)
 			pingCmd.Stdin, pingCmd.Stdout, pingCmd.Stderr = nil, nil, nil
 			if err := pingCmd.Run(); err == nil {
-				glog.V(1).Infof("IP [%s] is alive.", a2c.IP)
+				glog.V(1).Infof("IP [%s] is alive.", ip)
 				// start/continue caring its aliveness as got positive result at this instant
 				a2c.CheckedAlive, a2c.LastCheck = true, now
 				a2c.AssumeAlive, a2c.LastAlive = true, now
 			} else if ee, ok := err.(*exec.ExitError); ok {
-				glog.V(1).Infof("IP [%s] not alive, ping %+v", a2c.IP, ee)
+				glog.V(1).Infof("IP [%s] not alive, ping %+v", ip, ee)
 				a2c.CheckedAlive, a2c.LastCheck = false, now
 				if a2c.AssumeAlive { // check if death can be confirmed now
 					if now.After(a2c.LastAlive.Add(pulseCfg.DeathConfirm)) {
@@ -119,7 +139,7 @@ func init() {
 						alivenessMutext.Lock()
 						defer alivenessMutext.Unlock()
 
-						delete(aliveness, a2c.IP)
+						delete(aliveness, ip)
 					}()
 				}
 			} else {
@@ -131,10 +151,15 @@ func init() {
 				alivenessMutext.Lock()
 				defer alivenessMutext.Unlock()
 
-				aliveness[a2c.IP] = a2c
+				caringA2C, caring := aliveness[ip]
+				if caring {
+					// avoid overwriting with a stale cfg object
+					// a2c.Cfg may have been invalidated during checking without alivenessMutext locked
+					a2c.Cfg = caringA2C.Cfg
+				}
+				aliveness[ip] = a2c
 			}()
 		}
-
 	}()
 }
 
@@ -145,7 +170,7 @@ func CheckIpAlive(ip string) (bool, time.Time, interface{}) {
 
 	if caring { // check should be carried out periodically
 		if !now.Before(knownState.LastAlive.Add(pulseCfg.CheckInterval)) {
-			aliveCheckQueue <- knownState
+			aliveCheckQueue <- ip
 		}
 	}
 
@@ -201,7 +226,7 @@ func ListCaredIPs() []IpAliveness {
 		for _, ca := range aliveness {
 			if !ca.LastCheck.After(checkThres) {
 				// schedule a new check for it
-				aliveCheckQueue <- ca
+				aliveCheckQueue <- ca.IP
 			}
 			caList = append(caList, ca)
 		}
