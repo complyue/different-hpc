@@ -3,18 +3,14 @@ package bknd
 import (
 	"encoding/json"
 	"net/http"
-	"path/filepath"
 	"strings"
 
 	"github.com/complyue/different-hpc/pkg/ccm"
 	"github.com/complyue/hbigo/pkg/errors"
-	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 )
 
 func pixieApi(w http.ResponseWriter, r *http.Request) {
-	glog.V(1).Infof("Serving boot config for %s", filepath.Base(r.URL.Path))
-
 	vars := mux.Vars(r)
 	mac := vars["mac"]
 

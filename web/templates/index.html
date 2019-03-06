@@ -49,19 +49,20 @@
           {{ cnode.Cfg.Mac }}
         </td>
         <td>
-          <div
-            style="display: flex; flex-flow: column nowrap; align-items: end;"
-          >
-            <label style="flex: none;">
-              {{- cnode.Cfg.FileName -}}
-            </label>
-            <textarea
-              readonly
-              style="overflow: scroll; width: 100%; flex: 1; resize: both;"
+          <div class="ConfigFileEdit">
+            {%if cnode.Cfg.FileName %}
+            <span style="flex: none; text-align: left;">
+              <button data-act="save" disabled>&#x2714;</button>
+              <button data-act="cancel" disabled>&#x2718;</button>
+              <label>
+                {{- cnode.Cfg.FileName -}}
+              </label></span
             >
+            <textarea data-filename="{{ cnode.Cfg.FileName }}" readonly>
             {{- cnode.Cfg.RawYaml | safe -}}
           </textarea
             >
+            {%endif%}
           </div>
         </td>
       </tr>

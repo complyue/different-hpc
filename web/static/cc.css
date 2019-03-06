@@ -1,3 +1,22 @@
+/*
+ * Control Center
+ */
+
+html {
+  background-color: #f7f7f7;
+}
+
+body {
+  margin: 1px;
+  font-size: 100%;
+  padding: 1px 1px 0 21pt;
+  background-color: #f7f7f7;
+}
+
+body p {
+  line-height: 2em;
+}
+
 table {
   padding: 10pt;
   min-height: 10pt;
@@ -36,4 +55,23 @@ td {
 
 hr {
   border-color: #ddd;
+}
+
+button {
+  margin: 1px 2px;
+  padding: 2px;
+}
+
+div.ConfigFileEdit {
+  display: flex;
+  flex-flow: column nowrap;
+  align-items: stretch;
+}
+
+div.ConfigFileEdit > textarea {
+  overflow: scroll;
+  flex: 1;
+  resize: both;
+
+  background-color: #edf5ea;
 }

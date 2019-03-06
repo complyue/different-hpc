@@ -71,6 +71,70 @@ const (
 	cnodesDir = "etc/cnodes"
 )
 
+func loadComputeNodeCfg(fileName string, mac string) (*ComputeNodeCfg, error) {
+	fi, err := os.Stat(fileName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	// file exists, either manually created or modified,
+	// do a fresh load
+	rawYaml, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+	var cfgYaml yaml.MapSlice
+	err = yaml.Unmarshal(rawYaml, &cfgYaml)
+	if err != nil {
+		return nil, err
+	}
+	var cfgMac, ip string
+	for _, cfgItem := range cfgYaml {
+		if cfgKey, ok := cfgItem.Key.(string); ok {
+			if "mac" == cfgKey {
+				cfgMac = cfgItem.Value.(string)
+			} else if "ip" == cfgKey {
+				ip = cfgItem.Value.(string)
+			}
+		}
+	}
+
+	var problem error
+	if len(mac) > 0 && cfgMac != mac {
+		problem = errors.Errorf(
+			"invalid mac=[%s] vs [%s] in config file [%s]",
+			cfgMac, mac, fileName,
+		)
+	}
+	if len(ip) <= 0 {
+		problem = errors.Errorf(
+			"no ip in config file [%s]",
+			fileName,
+		)
+	}
+	if problem != nil {
+		glog.Warningf("Problem detected: %+v", problem)
+		d, f := filepath.Split(fileName)
+		bogonFileName := fmt.Sprintf("%s~%s.bogon-%s", d, f, time.Now().Format("20060102150405"))
+		glog.Infof("Renaming bogus config file from [%s] to [%s] ...",
+			fileName, bogonFileName)
+		if err = os.Rename(fileName, bogonFileName); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	cfg := &ComputeNodeCfg{
+		Mac: cfgMac, FileName: fileName,
+		FileTime: fi.ModTime(),
+		RawYaml:  string(rawYaml), CfgYaml: cfgYaml,
+	}
+	return cfg, nil
+}
+
 var (
 	knownComputeNodeCfgs map[string]*ComputeNodeCfg
 	mutexComputeNodeCfgs sync.Mutex
@@ -115,33 +179,13 @@ func _getComputeNodeCfgs() map[string]*ComputeNodeCfg {
 						glog.Errorf("Error loading compute node cfg file [%s]\n%+v", fileName, e)
 					}
 				}()
-				rawYaml, err := ioutil.ReadFile(fileName)
-				if err != nil {
+				if cfg, err := loadComputeNodeCfg(fileName, ""); err != nil {
 					panic(err)
+				} else if cfg != nil {
+					loadingCfgs[cfg.Mac] = cfg
+					// assume alive since initial load, by sole existance of a node's cfg file
+					CareIpAliveness(cfg.Inflate()["ip"].(string), true, cfg)
 				}
-				var cfgYaml yaml.MapSlice
-				err = yaml.Unmarshal(rawYaml, &cfgYaml)
-				if err != nil {
-					panic(err)
-				}
-				var cfgMac, ip string
-				for _, cfgItem := range cfgYaml {
-					if cfgKey, ok := cfgItem.Key.(string); ok {
-						if "mac" == cfgKey {
-							cfgMac = cfgItem.Value.(string)
-						} else if "ip" == cfgKey {
-							ip = cfgItem.Value.(string)
-						}
-					}
-				}
-				cfg := &ComputeNodeCfg{
-					Mac: cfgMac, FileName: fileName,
-					FileTime: fi.ModTime(),
-					RawYaml:  string(rawYaml), CfgYaml: cfgYaml,
-				}
-				loadingCfgs[cfgMac] = cfg
-				// assume alive since initial load, by sole existance of a node's cfg file
-				CareIpAliveness(ip, true, cfg)
 			}()
 		}
 		// only assign to global var after finished loading at all
@@ -178,15 +222,19 @@ func PrepareComputeNodeCfg(mac string) (*ComputeNodeCfg, error) {
 				glog.Errorf("Config file [%s] contains invalid mac=[%s] vs [%s] ?!",
 					cfg.FileName, cfg.Mac, mac)
 				d, f := filepath.Split(cfg.FileName)
-				bogonFileName := fmt.Sprintf("%s~bogon-%s-%s", d, f, time.Now().Format("20060102150405"))
+				bogonFileName := fmt.Sprintf("%s~%s.bogon-%s", d, f, time.Now().Format("20060102150405"))
 				glog.Infof("Renaming bogus config file from [%s] to [%s] ...",
 					cfg.FileName, bogonFileName)
-				os.Rename(cfg.FileName, bogonFileName)
+				if err := os.Rename(cfg.FileName, bogonFileName); err != nil {
+					panic(err)
+				}
 				delete(knownComputeNodeCfgs, mac)
 				glog.Warningf("A new configuration will be generated for mac=[%s]", mac)
-
 			} else if fi.ModTime() == cfg.FileTime {
+				// file not modified since last load
 				return cfg, nil
+			} else {
+				// file changed, fallthrough to do a fresh load
 			}
 		} else {
 			glog.Warningf("Config file [%s] for mac=[%s] deleted ?", cfg.FileName, cfg.Mac)
@@ -195,53 +243,16 @@ func PrepareComputeNodeCfg(mac string) (*ComputeNodeCfg, error) {
 
 	macKey := strings.Replace(mac, ":", "-", -1)
 	fileName := "etc/cnodes/" + macKey + ".yaml"
-
-	if fi, err := os.Stat(fileName); err == nil {
-		// file exists, either manually created or modified,
-		// do a fresh load
-		rawYaml, err := ioutil.ReadFile(fileName)
-		if err != nil {
-			panic(err)
-		}
-		var cfgYaml yaml.MapSlice
-		err = yaml.Unmarshal(rawYaml, &cfgYaml)
-		if err != nil {
-			panic(err)
-		}
-		var cfgMac, ip string
-		for _, cfgItem := range cfgYaml {
-			if cfgKey, ok := cfgItem.Key.(string); ok {
-				if "mac" == cfgKey {
-					cfgMac = cfgItem.Value.(string)
-				} else if "ip" == cfgKey {
-					ip = cfgItem.Value.(string)
-				}
-			}
-		}
-		if cfgMac != mac {
-			panic(errors.Errorf(
-				"Invalid mac=[%s] in config for mac=[%s], file=[%s]",
-				cfgMac, mac, fileName,
-			))
-		}
-		if len(ip) <= 0 {
-			panic(errors.Errorf(
-				"Invalid ip=[%s] in config for mac=[%s], file=[%s]",
-				ip, mac, fileName,
-			))
-		}
-		cfg := &ComputeNodeCfg{
-			Mac: mac, FileName: fileName,
-			FileTime: fi.ModTime(),
-			RawYaml:  string(rawYaml), CfgYaml: cfgYaml,
-		}
+	if cfg, err := loadComputeNodeCfg(fileName, mac); err != nil {
+		panic(err)
+	} else if cfg != nil {
 		knownComputeNodeCfgs[mac] = cfg
-		CareIpAliveness(ip, true, cfg)
+		CareIpAliveness(cfg.Inflate()["ip"].(string), true, cfg)
 		return cfg, nil
 	}
 
 	// no cfg yet, auto assign an IP and create the cfg
-	glog.Infof("Compute node with mac=[%s] has no config yet, generating ...", mac)
+	glog.Infof("Generating config for compute node with mac=[%s] ...", mac)
 
 	// todo: cache the template cfg, reload on mod time change
 	tmplFileName := "etc/cnode.yaml"
@@ -314,10 +325,12 @@ func PrepareComputeNodeCfg(mac string) (*ComputeNodeCfg, error) {
 		switch deadCfg := reuseIP.LastCfg.(type) {
 		case *ComputeNodeCfg:
 			d, f := filepath.Split(deadCfg.FileName)
-			corpseFileName := fmt.Sprintf("%s~corpse-%s-%s", d, f, time.Now().Format("20060102150405"))
+			corpseFileName := fmt.Sprintf("%s~%s.corpse-%s", d, f, time.Now().Format("20060102150405"))
 			glog.Infof("To reuse ip=[%s], the old config file is to be renamed from [%s] to [%s] ...",
 				reuseIP.IP, deadCfg.FileName, corpseFileName)
-			os.Rename(deadCfg.FileName, corpseFileName)
+			if err := os.Rename(deadCfg.FileName, corpseFileName); err != nil {
+				panic(err)
+			}
 			delete(knownComputeNodeCfgs, deadCfg.Mac)
 			glog.Warningf("Reusing ip=[%s] from [%s], which has been renamed to [%s]",
 				reuseIP.IP, deadCfg.FileName, corpseFileName)
