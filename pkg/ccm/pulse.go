@@ -1,6 +1,7 @@
 package ccm
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os/exec"
 	"sort"
@@ -15,6 +16,9 @@ import (
 type PulseCfg struct {
 	// user name used in ssh url
 	SshUser string `yaml:"sshUser"`
+
+	// ping with this many packets
+	PingCount int `yaml:"pingCount"`
 
 	// don't repeat check too often
 	CheckInterval time.Duration `yaml:"checkInterval"`
@@ -91,7 +95,7 @@ func init() {
 			}
 
 			glog.V(1).Infof("Pinging ip=[%s] for alive check ...", a2c.IP)
-			pingCmd := exec.Command("ping", "-c", "3", a2c.IP)
+			pingCmd := exec.Command("ping", "-c", fmt.Sprintf("%d", pulseCfg.PingCount), a2c.IP)
 			pingCmd.Stdin, pingCmd.Stdout, pingCmd.Stderr = nil, nil, nil
 			if err := pingCmd.Run(); err == nil {
 				glog.V(1).Infof("IP [%s] is alive.", a2c.IP)
@@ -149,7 +153,7 @@ func CheckIpAlive(ip string) (bool, time.Time, interface{}) {
 		return true, knownState.LastAlive, knownState.Cfg
 	}
 
-	pingCmd := exec.Command("ping", "-c", "3", ip)
+	pingCmd := exec.Command("ping", "-c", fmt.Sprintf("%d", pulseCfg.PingCount), ip)
 	pingCmd.Stdin, pingCmd.Stdout, pingCmd.Stderr = nil, nil, nil
 	if err := pingCmd.Run(); err == nil {
 		glog.V(1).Infof("IP [%s] is alive.", ip)
