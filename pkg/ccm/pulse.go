@@ -65,20 +65,31 @@ var (
 	aliveCheckQueue = make(chan string, 500)
 )
 
+func ForgetIp(ip string) {
+	alivenessMutext.Lock()
+	defer alivenessMutext.Unlock()
+
+	delete(aliveness, ip)
+}
+
 func CareIpAliveness(ip string, AssumeAlive bool, cfg interface{}) {
 	alivenessMutext.Lock()
 	defer alivenessMutext.Unlock()
 
-	var LastAlive time.Time
+	knownState, caring := aliveness[ip]
+	if !caring {
+		knownState.IP = ip
+	}
+
 	if AssumeAlive {
-		LastAlive = time.Now()
+		knownState.AssumeAlive, knownState.LastAlive = true, time.Now()
 	}
-	aliveness[ip] = IpAliveness{
-		IP:          ip,
-		AssumeAlive: AssumeAlive, LastAlive: LastAlive,
-		CheckedAlive: false, LastCheck: time.Time{},
-		Cfg: cfg,
-	}
+
+	knownState.Cfg = cfg
+
+	aliveness[ip] = knownState
+
+	aliveCheckQueue <- ip
 }
 
 func init() {

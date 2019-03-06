@@ -71,7 +71,7 @@ const (
 	cnodesDir = "etc/cnodes"
 )
 
-func loadComputeNodeCfg(fileName string, mac string) (*ComputeNodeCfg, error) {
+func LoadComputeNodeCfg(fileName string, mac string) (*ComputeNodeCfg, error) {
 	fi, err := os.Stat(fileName)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -140,6 +140,19 @@ var (
 	mutexComputeNodeCfgs sync.Mutex
 )
 
+func ReloadComputeNodeCfg(fileName string) (*ComputeNodeCfg, error) {
+	cfg, err := LoadComputeNodeCfg(fileName, "")
+	if err != nil {
+		return cfg, err
+	}
+
+	mutexComputeNodeCfgs.Lock()
+	defer mutexComputeNodeCfgs.Unlock()
+
+	knownComputeNodeCfgs[cfg.Mac] = cfg
+	return cfg, nil
+}
+
 func _getComputeNodeCfgs() map[string]*ComputeNodeCfg {
 	if nil == knownComputeNodeCfgs {
 		// do initial loading cfg for all known compute nodes
@@ -179,7 +192,7 @@ func _getComputeNodeCfgs() map[string]*ComputeNodeCfg {
 						glog.Errorf("Error loading compute node cfg file [%s]\n%+v", fileName, e)
 					}
 				}()
-				if cfg, err := loadComputeNodeCfg(fileName, ""); err != nil {
+				if cfg, err := LoadComputeNodeCfg(fileName, ""); err != nil {
 					panic(err)
 				} else if cfg != nil {
 					loadingCfgs[cfg.Mac] = cfg
@@ -243,7 +256,7 @@ func PrepareComputeNodeCfg(mac string) (*ComputeNodeCfg, error) {
 
 	macKey := strings.Replace(mac, ":", "-", -1)
 	fileName := "etc/cnodes/" + macKey + ".yaml"
-	if cfg, err := loadComputeNodeCfg(fileName, mac); err != nil {
+	if cfg, err := LoadComputeNodeCfg(fileName, mac); err != nil {
 		panic(err)
 	} else if cfg != nil {
 		knownComputeNodeCfgs[mac] = cfg

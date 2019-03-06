@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 
+	"github.com/complyue/different-hpc/pkg/ccm"
 	"github.com/golang/glog"
 )
 
@@ -28,24 +28,30 @@ func cnodeSaveCfg(w http.ResponseWriter, r *http.Request) {
 			}
 		}()
 
-		if fi, err := os.Stat(req.FileName); err == nil {
-			// file exists
-			rawYaml, err := ioutil.ReadFile(req.FileName)
-			if err != nil {
-				panic(err)
-			}
-			if len(req.PreEdit) > 0 && req.PreEdit != string(rawYaml) {
-				jsonResult["err"] = fmt.Sprintf("Config file has changed at %v", fi.ModTime)
-				return
-			}
-		} else {
+		oldCfg, err := ccm.LoadComputeNodeCfg(req.FileName, "")
+		if err != nil {
+			panic(err)
+		}
+		if oldCfg == nil {
 			// file disappeared
 			glog.Warningf("Config file [%s] disappeared.", req.FileName)
+		} else {
+			if len(req.PreEdit) > 0 && req.PreEdit != oldCfg.RawYaml {
+				jsonResult["err"] = fmt.Sprintf("Config file has changed!")
+				return
+			}
+			ccm.ForgetIp(oldCfg.Inflate()["ip"].(string))
 		}
 
 		if err := ioutil.WriteFile(req.FileName, ([]byte)(req.AfterEdit), 0644); err != nil {
 			glog.Errorf("Error saving compute node config file [%s]:\n%+v", req.FileName, err)
 			jsonResult["err"] = fmt.Sprintf("Failed saving config file: %+v", err)
+		}
+
+		if cfg, err := ccm.ReloadComputeNodeCfg(req.FileName); err != nil {
+			panic(err)
+		} else {
+			ccm.CareIpAliveness(cfg.Inflate()["ip"].(string), false, cfg)
 		}
 	}()
 	if err := json.NewEncoder(w).Encode(jsonResult); err != nil {
