@@ -10,7 +10,8 @@
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/cmd/dhpc-cc",
       "args": [
-        "-dev"
+        "-dev",
+        "-v=1"
         //   "-logtostderr=false",
         //   "-log_dir=log",
         //   "-stderrthreshold=WARNING"

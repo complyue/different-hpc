@@ -2,7 +2,10 @@
 sshUser: dwa
 
 # don't repeat check too often
-checkInterval: 10m
+checkInterval: 1m
 
 # confirm death only after this long
 deathConfirm: 48h
+
+# forget after this long
+forgetDead: 72h
