@@ -56,7 +56,7 @@ type IpAliveness struct {
 	AssumeAlive, CheckedAlive bool
 	LastAlive, LastCheck      time.Time
 
-	Cfg interface{}
+	Cfgs []*ComputeNodeCfg
 }
 
 var (
@@ -65,14 +65,31 @@ var (
 	aliveCheckQueue = make(chan string, 500)
 )
 
-func ForgetIp(ip string) {
+func ForgetCfg(cfg *ComputeNodeCfg) {
+	cfgData := cfg.Inflate()
+	ip := cfgData["ip"].(string)
+
 	alivenessMutext.Lock()
 	defer alivenessMutext.Unlock()
 
-	delete(aliveness, ip)
+	knownState, caring := aliveness[ip]
+	if !caring {
+		return
+	}
+	for ci, c := range knownState.Cfgs {
+		if c.Mac == cfg.Mac {
+			// found the matching MAC record, remove it
+			knownState.Cfgs = append(knownState.Cfgs[:ci], knownState.Cfgs[ci+1:]...)
+			break
+		}
+	}
+	if len(knownState.Cfgs) < 1 {
+		// no more config associated with this ip
+		delete(aliveness, ip)
+	}
 }
 
-func CareIpAliveness(ip string, AssumeAlive bool, cfg interface{}) {
+func CareIpAliveness(ip string, AssumeAlive bool, cfg *ComputeNodeCfg) {
 	alivenessMutext.Lock()
 	defer alivenessMutext.Unlock()
 
@@ -85,7 +102,17 @@ func CareIpAliveness(ip string, AssumeAlive bool, cfg interface{}) {
 		knownState.AssumeAlive, knownState.LastAlive = true, time.Now()
 	}
 
-	knownState.Cfg = cfg
+	replacedCfg := false
+	for ci, c := range knownState.Cfgs {
+		if c.Mac == cfg.Mac {
+			knownState.Cfgs[ci] = cfg
+			replacedCfg = true
+			break
+		}
+	}
+	if !replacedCfg {
+		knownState.Cfgs = append(knownState.Cfgs, cfg)
+	}
 
 	aliveness[ip] = knownState
 
@@ -166,7 +193,7 @@ func init() {
 				if caring {
 					// avoid overwriting with a stale cfg object
 					// a2c.Cfg may have been invalidated during checking without alivenessMutext locked
-					a2c.Cfg = caringA2C.Cfg
+					a2c.Cfgs = caringA2C.Cfgs
 				}
 				aliveness[ip] = a2c
 			}()
@@ -174,7 +201,7 @@ func init() {
 	}()
 }
 
-func CheckIpAlive(ip string) (bool, time.Time, interface{}) {
+func CheckIpAlive(ip string) (bool, time.Time, []*ComputeNodeCfg) {
 	pulseCfg := GetPulseCfg()
 	knownState, caring := aliveness[ip]
 	now := time.Now()
@@ -186,7 +213,7 @@ func CheckIpAlive(ip string) (bool, time.Time, interface{}) {
 	}
 
 	if caring && knownState.AssumeAlive { // still assuming alive
-		return true, knownState.LastAlive, knownState.Cfg
+		return true, knownState.LastAlive, knownState.Cfgs
 	}
 
 	pingCmd := exec.Command("ping", "-c", fmt.Sprintf("%d", pulseCfg.PingCount), ip)
@@ -199,7 +226,7 @@ func CheckIpAlive(ip string) (bool, time.Time, interface{}) {
 			IP:          ip,
 			AssumeAlive: true, LastAlive: now,
 			CheckedAlive: true, LastCheck: now,
-			Cfg: knownState.Cfg,
+			Cfgs: knownState.Cfgs,
 		}
 	} else if ee, ok := err.(*exec.ExitError); ok {
 		glog.V(1).Infof("IP [%s] not alive, ping %+v", ip, ee)
@@ -221,7 +248,7 @@ func CheckIpAlive(ip string) (bool, time.Time, interface{}) {
 		aliveness[ip] = knownState
 	}()
 
-	return knownState.AssumeAlive, knownState.LastAlive, knownState.Cfg
+	return knownState.AssumeAlive, knownState.LastAlive, knownState.Cfgs
 }
 
 func ListCaredIPs() []IpAliveness {

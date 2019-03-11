@@ -20,7 +20,7 @@ func DefinePageRoutes(router *mux.Router) {
 			ctx["sshUser"] = pulseCfg.SshUser
 
 			ccm.GetComputeNodeCfgs()
-			ctx["cnodes"] = ccm.ListCaredIPs()
+			ctx["cnips"] = ccm.ListCaredIPs()
 		},
 	})
 

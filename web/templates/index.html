@@ -28,45 +28,46 @@
       </tr>
     </thead>
     <tbody>
-      {%for cnode in cnodes %} {%with cnode.Cfg.Inflate() as cfg%}
+      {%for cnip in cnips%} {%for cfg in cnip.Cfgs %} {%with cfg.Inflate() as cfgd %}
+      <!--  -->
       <tr>
-        <td>{{ cfg.hostname }}</td>
+        <td>{{ cfgd.hostname }}</td>
         <td>
-          {{ cnode.LastAlive | date: "2006-01-02" | safe }}
+          {{ cnip.LastAlive | date: "2006-01-02" | safe }}
           <br />
-          {%if cnode.AssumeAlive %} &#x2714;{%else%} &#x2718; {%endif%}
-          {{ cnode.LastAlive | date: "15:04:05" | safe }}
+          {%if cnip.AssumeAlive %} &#x2714;{%else%} &#x2718; {%endif%}
+          {{ cnip.LastAlive | date: "15:04:05" | safe }}
         </td>
         <td>
-          {{ cnode.LastCheck | date: "2006-01-02" | safe }}
+          {{ cnip.LastCheck | date: "2006-01-02" | safe }}
           <br />
-          {%if cnode.CheckedAlive %} &#x2714;{%else%} &#x2718; {%endif%}
-          {{ cnode.LastCheck | date: "15:04:05" | safe }}
+          {%if cnip.CheckedAlive %} &#x2714;{%else%} &#x2718; {%endif%}
+          {{ cnip.LastCheck | date: "15:04:05" | safe }}
         </td>
         <td>
-          <a href="ssh://{{ sshUser }}@{{ cnode.IP }}">{{ cnode.IP }}</a>
+          <a href="ssh://{{ sshUser }}@{{ cnip.IP }}">{{ cnip.IP }}</a>
           <br />
-          {{ cnode.Cfg.Mac }}
+          {{ cfg.Mac }}
         </td>
         <td>
           <div class="ConfigFileEdit">
-            {%if cnode.Cfg.FileName %}
+            {%if cfg.FileName %}
             <span style="flex: none; text-align: left;">
               <button data-act="save" disabled>&#x2714;</button>
               <button data-act="cancel" disabled>&#x2718;</button>
               <label>
-                {{- cnode.Cfg.FileName -}}
+                {{- cfg.FileName -}}
               </label></span
             >
-            <textarea data-filename="{{ cnode.Cfg.FileName }}" readonly>
-            {{- cnode.Cfg.RawYaml | safe -}}
-          </textarea
-            >
+            <textarea data-filename="{{ cfg.FileName }}" readonly>
+              {{- cfg.RawYaml | safe -}}
+            </textarea>
             {%endif%}
           </div>
         </td>
       </tr>
-      {%endwith%} {%endfor%}
+      <!--  -->
+      {%endwith%} {%endfor%} {%endfor%}
     </tbody>
   </table>
 </section>

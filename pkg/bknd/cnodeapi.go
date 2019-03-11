@@ -40,7 +40,7 @@ func cnodeSaveCfg(w http.ResponseWriter, r *http.Request) {
 				jsonResult["err"] = fmt.Sprintf("Config file has changed!")
 				return
 			}
-			ccm.ForgetIp(oldCfg.Inflate()["ip"].(string))
+			ccm.ForgetCfg(oldCfg)
 		}
 
 		if err := ioutil.WriteFile(req.FileName, ([]byte)(req.AfterEdit), 0644); err != nil {
