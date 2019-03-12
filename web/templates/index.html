@@ -37,7 +37,7 @@
           <span style="display: block;"> {{ cfgd.hostname }}</span>
           <a href="ssh://{{ sshUser }}@{{ cnip.IP }}">SSH</a>
           &middot;
-          <a href="vnc://{{ cnip.IP }}">VNC </a>
+          <a href="vnc://{{ cnip.IP }}:5900">VNC</a>
         </td>
         <td>
           {{ cnip.LastAlive | date: "2006-01-02" | safe }}
