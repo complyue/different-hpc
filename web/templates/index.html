@@ -28,10 +28,17 @@
       </tr>
     </thead>
     <tbody>
-      {%for cnip in cnips%} {%for cfg in cnip.Cfgs %} {%with cfg.Inflate() as cfgd %}
+      {%for cnip in cnips%} {%for cfg in cnip.Cfgs %}
       <!--  -->
-      <tr>
-        <td>{{ cfgd.hostname }}</td>
+      {%with cfg.Inflate() as cfgd %}
+      <!--  -->
+      <tr style="font-family: monospace;">
+        <td>
+          <span style="display: block;"> {{ cfgd.hostname }}</span>
+          <a href="ssh://{{ sshUser }}@{{ cnip.IP }}">SSH</a>
+          &middot;
+          <a href="vnc://{{ cnip.IP }}">VNC </a>
+        </td>
         <td>
           {{ cnip.LastAlive | date: "2006-01-02" | safe }}
           <br />
@@ -45,9 +52,12 @@
           {{ cnip.LastCheck | date: "15:04:05" | safe }}
         </td>
         <td>
-          <a href="ssh://{{ sshUser }}@{{ cnip.IP }}">{{ cnip.IP }}</a>
-          <br />
-          {{ cfg.Mac }}
+          <span style="display: block; ">
+            {{ cnip.IP }}
+          </span>
+          <span style="display: block; font-size: 62%;">
+            {{ cfg.Mac }}
+          </span>
         </td>
         <td>
           <div class="ConfigFileEdit">
@@ -67,7 +77,9 @@
         </td>
       </tr>
       <!--  -->
-      {%endwith%} {%endfor%} {%endfor%}
+      {%endwith%}
+      <!--  -->
+      {%endfor%} {%endfor%}
     </tbody>
   </table>
 </section>
