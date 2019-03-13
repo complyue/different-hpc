@@ -1,11 +1,11 @@
 # user name used in ssh url
-sshUser: dwa
+sshUser: dw
 
 # ping with this many packets
 pingCount: 10
 
 # don't repeat check too often
-checkInterval: 1m
+checkInterval: 5m
 
 # confirm death only after this long
 deathConfirm: 48h

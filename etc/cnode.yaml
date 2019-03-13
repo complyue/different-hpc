@@ -13,7 +13,7 @@ hostname: "dwc{{.ipnum}}"
 # nfsroot
 nfs_server: 192.168.11.10
 nfs_path: /dwcroot
-nfs_options: ro,noacl
+nfs_options: ro,noacl,retrans=3000
 
 # add single to kernel cmdline to boot into single user run level for rescue
 rescue: ""
@@ -28,6 +28,7 @@ cmdline:
   # with a single space as separator, before passed to pixiecore.
   # while empty values will be dropped.
   - root=/dev/nfs
+  - rootdelay=3
   - nfsroot={{.nfs_server}}:{{.nfs_path}},{{.nfs_options}}
   - ip={{.ip}}:{{.nfs_server}}:{{.gateway}}:{{.netmask}}:{{.hostname}}::none
   - "{{.rescue}}"
