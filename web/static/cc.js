@@ -2,6 +2,43 @@
  * Control Center
  */
 
+function getOffset(el) {
+  var _x = 0;
+  var _y = 0;
+  while (el && !isNaN(el.offsetLeft) && !isNaN(el.offsetTop)) {
+    _x += el.offsetLeft - el.scrollLeft;
+    _y += el.offsetTop - el.scrollTop;
+    el = el.offsetParent;
+  }
+  return { top: _y, left: _x };
+}
+
+function startEditTextArea(ta) {
+  const { top, left } = getOffset(ta);
+  const width = ta.scrollWidth;
+
+  const tast = ta.style;
+
+  tast.width = "" + width + "px";
+  setTimeout(() => {
+    const height = ta.scrollHeight;
+    tast.position = "fixed";
+    tast.height = "" + height + "px";
+    tast.top = "" + (top + 16) + "px";
+    tast.left = "" + left + "px";
+  }, 1);
+}
+
+function stopEditTextArea(ta) {
+  const tast = ta.style;
+
+  tast.position = "";
+  tast.width = "";
+  tast.height = "";
+  tast.top = "";
+  tast.left = "";
+}
+
 const cnodeTable = document.getElementById("cnode_tbl");
 
 // double click on textareas
@@ -27,7 +64,7 @@ cnodeTable.addEventListener("dblclick", function(evt) {
 
     ta.blur();
     ta.focus();
-    //   setTimeout(() => {}, 1);
+    startEditTextArea(ta);
   }
 
   // cease other behaviors for double click on readonly textarea
@@ -69,6 +106,7 @@ cnodeTable.addEventListener("click", async function(evt) {
             return;
           }
           ta.readOnly = true;
+          stopEditTextArea(ta);
           for (let btn of cfe.querySelectorAll("button")) {
             btn.disabled = true;
           }
@@ -82,6 +120,7 @@ cnodeTable.addEventListener("click", async function(evt) {
       for (let ta of cfe.querySelectorAll("textarea")) {
         ta.readOnly = true;
         ta.value = ta.dataset.preEdit;
+        stopEditTextArea(ta);
       }
       for (let btn of cfe.querySelectorAll("button")) {
         btn.disabled = true;
