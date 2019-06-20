@@ -19,7 +19,10 @@ import (
 )
 
 type ComputeNodeCfg struct {
-	Mac      string
+	Mac string
+
+	GuiType, GuiHref string
+
 	FileName string
 	FileTime time.Time
 
@@ -92,12 +95,17 @@ func LoadComputeNodeCfg(fileName string, mac string) (*ComputeNodeCfg, error) {
 		return nil, err
 	}
 	var cfgMac, ip string
+	var guiType, guiHref string
 	for _, cfgItem := range cfgYaml {
 		if cfgKey, ok := cfgItem.Key.(string); ok {
 			if "mac" == cfgKey {
 				cfgMac = cfgItem.Value.(string)
 			} else if "ip" == cfgKey {
 				ip = cfgItem.Value.(string)
+			} else if "guiHref" == cfgKey {
+				guiHref = cfgItem.Value.(string)
+			} else if "guiType" == cfgKey {
+				guiType = cfgItem.Value.(string)
 			}
 		}
 	}
@@ -128,9 +136,10 @@ func LoadComputeNodeCfg(fileName string, mac string) (*ComputeNodeCfg, error) {
 	}
 
 	cfg := &ComputeNodeCfg{
-		Mac: cfgMac, FileName: fileName,
-		FileTime: fi.ModTime(),
-		RawYaml:  string(rawYaml), CfgYaml: cfgYaml,
+		Mac:     cfgMac,
+		GuiType: guiType, GuiHref: guiHref,
+		FileName: fileName, FileTime: fi.ModTime(),
+		RawYaml: string(rawYaml), CfgYaml: cfgYaml,
 	}
 	return cfg, nil
 }
