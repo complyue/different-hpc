@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/complyue/different-hpc/pkg/bknd"
-	"github.com/complyue/hbigo/pkg/errors"
+	"github.com/complyue/hbi/pkg/errors"
 	"github.com/golang/glog"
 	"github.com/gorilla/mux"
 	yaml "gopkg.in/yaml.v2"

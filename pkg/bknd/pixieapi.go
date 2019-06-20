@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/complyue/different-hpc/pkg/ccm"
-	"github.com/complyue/hbigo/pkg/errors"
+	"github.com/complyue/hbi/pkg/errors"
 	"github.com/gorilla/mux"
 )
 

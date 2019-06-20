@@ -13,7 +13,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/complyue/hbigo/pkg/errors"
+	"github.com/complyue/hbi/pkg/errors"
 	"github.com/golang/glog"
 	"gopkg.in/yaml.v2"
 )
